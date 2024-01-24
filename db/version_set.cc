@@ -597,6 +597,19 @@ class FilePickerMultiGet {
       // was not found, we need to skip lookup for the remaining keys and
       // reset the search bounds
       if (batch_iter_ != current_level_range_.end()) {
+#ifndef NDEBUG
+        if (curr_level_ < num_levels_ + 1) {
+          if ((*level_files_brief_)[curr_level_].num_files == 0) {
+            struct FilePickerContext& fp_ctx =
+                fp_ctx_array_[batch_iter_.index()];
+
+            assert(fp_ctx.search_left_bound == 0);
+            assert(fp_ctx.search_right_bound == -1 ||
+                   fp_ctx.search_right_bound == FileIndexer::kLevelMaxIndex);
+          }
+        }
+#endif  // NDBEUG
+
         ++batch_iter_;
         for (; batch_iter_ != current_level_range_.end(); ++batch_iter_) {
           struct FilePickerContext& fp_ctx = fp_ctx_array_[batch_iter_.index()];
@@ -803,6 +816,8 @@ class FilePickerMultiGet {
             continue;
           }
         }
+        assert(start_index >= 0);
+        assert(start_index < static_cast<int32_t>(curr_file_level_->num_files));
         fp_ctx.start_index_in_curr_level = start_index;
         fp_ctx.curr_index_in_curr_level = start_index;
       }
@@ -4531,8 +4546,10 @@ const char* VersionStorageInfo::LevelSummary(
     // overwrite the last space
     --len;
   }
-  len += snprintf(scratch->buffer + len, sizeof(scratch->buffer) - len,
-                  "] max score %.2f", compaction_score_[0]);
+  len +=
+      snprintf(scratch->buffer + len, sizeof(scratch->buffer) - len,
+               "] max score %.2f, estimated pending compaction bytes %" PRIu64,
+               compaction_score_[0], estimated_compaction_needed_bytes_);
 
   if (!files_marked_for_compaction_.empty()) {
     snprintf(scratch->buffer + len, sizeof(scratch->buffer) - len,
